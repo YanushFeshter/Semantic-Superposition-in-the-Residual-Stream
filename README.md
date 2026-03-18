@@ -2,7 +2,7 @@
 
 **Paper:** Residual Stream Geometry Reveals Semantic Superposition: Evidence from Decision-Axis Trajectory Analysis  
 **Author:** Yanush Feshter (ORCID: 0009-0002-1330-7530)  
-**DOI:** [10.5281/zenodo.XXXXXXX](https://doi.org/10.5281/zenodo.XXXXXXX) *(update after upload)*
+**DOI:** [10.5281/zenodo.18927815](https://doi.org/10.5281/zenodo.18927815)
 
 ## Overview
 
@@ -19,7 +19,7 @@ We interpret this as geometric evidence that transformers maintain competing int
 
 ## Key Figure
 
-![Direction Specificity Control](prepub_tests/prepub_tests.png)
+![Direction Specificity Control](prepub_tests-2.png)
 
 *Left: Variance ratio by layer (no individual layer survives FDR correction). Right: The semantic decision axis (red, ratio 1.81) far exceeds 100 random directions (blue histogram). Zero random directions reproduce the effect.*
 
@@ -75,7 +75,7 @@ The critical control: we repeat this for 100 random directions in the embedding 
   author={Feshter, Yanush},
   year={2026},
   publisher={Zenodo},
-  doi={10.5281/zenodo.XXXXXXX}
+  doi={10.5281/zenodo.18927815}
 }
 ```
 

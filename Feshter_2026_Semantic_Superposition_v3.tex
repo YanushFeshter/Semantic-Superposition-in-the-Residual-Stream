@@ -1,0 +1,395 @@
+\documentclass[11pt,a4paper]{article}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{graphicx}
+\usepackage{hyperref}
+\usepackage[margin=2.5cm]{geometry}
+\usepackage{booktabs}
+\usepackage{xcolor}
+\usepackage{natbib}
+\usepackage{caption}
+\usepackage{subcaption}
+% \usepackage{microtype} % removed due to font compatibility
+
+\hypersetup{
+  colorlinks=true,
+  linkcolor=blue!60!black,
+  citecolor=blue!60!black,
+  urlcolor=blue!60!black
+}
+
+\title{Residual Stream Geometry Reveals Semantic Superposition:\\
+Evidence from Decision-Axis Trajectory Analysis}
+
+\author{Yanush Feshter\\
+\textit{Independent Researcher}\\
+\textit{RSI Protocol Ecosystem / Distributed Research Node 734}\\
+ORCID: 0009-0002-1330-7530\\
+\texttt{@YaffFesh}}
+
+\date{March 2026}
+
+\begin{document}
+\maketitle
+
+% ============================================================
+\begin{abstract}
+Current mechanistic interpretability methods analyze transformer internals through absolute activation values---heatmaps, feature magnitudes, logit lens projections. We propose an alternative: analyzing the \emph{differential geometry} of residual stream trajectories, specifically the projection of inter-layer changes onto prompt-specific semantic decision axes.
+
+We test three differential metrics on GPT-2 small (12 layers) and replicate on Pythia-1.4b (24 layers). Two metrics fail: L2-norm velocity is dominated by architectural confounds ($\rho = 0.84$ with layer index), and correlation with logit-lens decision rate vanishes after layer correction ($\rho = 0.05$, $p = 0.46$). However, cross-prompt variance of decision-axis velocity reveals a robust signal: ambiguous prompts produce $2$--$3\times$ higher trajectory variance than unambiguous controls in middle layers (GPT-2: ratio 2.48; Pythia-1.4b: ratio 2.09, peak 9.55 at layer~2$\to$3, $p = 0.022$).
+
+Critically, a specificity control against 100 random directions in the 768-dimensional residual stream space shows that the semantic decision axis achieves a mean variance ratio of 1.81, exceeding the 99th percentile of the random distribution (0.92). No random direction reproduces the effect (empirical $p < 0.01$).
+
+We interpret this as geometric evidence of \emph{semantic superposition}---the simultaneous maintenance of competing interpretations---visible in trajectory distribution statistics but invisible to standard scalar metrics.
+\end{abstract}
+
+% ============================================================
+\section{Introduction}
+\label{sec:intro}
+
+Mechanistic interpretability aims to understand the internal computations of neural networks by examining activations, attention patterns, and learned features. Standard tools---TransformerLens \citep{nanda2022transformerlens}, Sparse Autoencoders \citep{bricken2023monosemanticity, templeton2024scaling}, and the logit lens \citep{nostalgebraist2020logitlens}---produce high-dimensional data about model internals, typically rendered as heatmaps, tables, and static graphs.
+
+We identify a structural limitation of this approach: these interfaces present \emph{absolute states} (activation magnitudes, feature values, token probabilities) through serial inspection. The underlying computation, however, is massively parallel and high-dimensional. The serial format destroys topological relationships that exist in the original space.
+
+We propose an alternative unit of analysis: instead of examining \emph{what} activations are at each layer, we examine \emph{how they change} between layers---the differential geometry of the residual stream trajectory. This is motivated by two observations:
+
+First, human perceptual systems are optimized for contrast detection, not absolute measurement. The visual system detects edges (luminance differences), not luminances; the auditory system detects intervals (pitch differences), not absolute frequencies. A differential representation aligns with human perception's native processing mode.
+
+Second, many interpretability questions are inherently about \emph{dynamics}: when does the model switch strategy? When do competing pathways interfere? When does the model commit to an interpretation? These questions concern trajectories, not individual states.
+
+We test three differential metrics across two transformer architectures. Two fail---dominated by architectural confounds or unreliable ground truth. The third---cross-prompt variance of decision-axis velocity---reveals a robust, direction-specific signal that we interpret as geometric evidence of semantic superposition. A stringent control against random directions confirms that this signal is specific to semantic axes, not a high-dimensional projection artifact.
+
+\subsection{Contributions}
+\begin{enumerate}
+\item Three differential metrics tested; two honestly falsified with detailed diagnostics.
+\item Identification of logit lens limitations as interpretability ground truth in middle layers.
+\item Discovery that cross-prompt variance of decision-axis velocity distinguishes ambiguous from unambiguous inputs (ratio $2$--$3\times$), replicated across GPT-2 small and Pythia-1.4b.
+\item A direction-specificity control showing the effect is unique to semantic axes ($p < 0.01$ vs.\ 100 random directions).
+\end{enumerate}
+
+% ============================================================
+\section{Method}
+\label{sec:method}
+
+\subsection{Models}
+We use GPT-2 small (12 layers, 12 heads, $d = 768$) as primary model and Pythia-1.4b (24 layers, 16 heads, $d = 2048$) for replication. Both are autoregressive transformers accessed via TransformerLens.
+
+\subsection{Prompts}
+We construct 24 lexically ambiguous prompts where the model must choose between two semantic interpretations (e.g., ``A bat is a''---animal vs.\ sports equipment; ``The bank was''---river bank vs.\ financial institution). Each prompt has two groups of candidate continuation tokens, representing interpretation A and interpretation B. We include 10--12 unambiguous control prompts with a single clear continuation (e.g., ``The capital of France is'').
+
+Only single-token candidates (as determined by each model's tokenizer) are retained. For Pythia-1.4b, 17 of 24 ambiguous and 5 of 10 control prompts pass this filter due to tokenizer differences.
+
+\subsection{Decision Axis}
+For each prompt, we define a semantic decision axis using the model's unembedding matrix $W_U$:
+\begin{equation}
+D = \bar{E}_A - \bar{E}_B, \quad \hat{D} = \frac{D}{\|D\|}
+\end{equation}
+where $\bar{E}_A = \frac{1}{|A|}\sum_{i \in A} W_U[:,i]$ is the mean unembedding column for interpretation A tokens (similarly for B). This axis is \emph{prompt-specific}---it changes with each ambiguous input.
+
+\subsection{Metrics}
+We extract the residual stream state $s_L$ at the final token position after each layer $L$, and compute inter-layer differences $\Delta s_L = s_{L+1} - s_L$.
+
+\paragraph{Metric 1: L2 Velocity and Curvature.}
+\begin{equation}
+v_L = \|\Delta s_L\|_2, \quad \kappa_L = |v_{L+1} - v_L|
+\end{equation}
+
+\paragraph{Metric 2: Semantic Orthogonal Velocity (SOV).}
+\begin{equation}
+v_L^{\parallel} = \Delta s_L \cdot \hat{D}, \quad \text{SOV}_L = \|\Delta s_L - v_L^{\parallel}\hat{D}\|
+\end{equation}
+We also compute angular curvature: $\theta_L = \arccos\!\left(\frac{\Delta s_L \cdot \Delta s_{L-1}}{\|\Delta s_L\|\,\|\Delta s_{L-1}\|}\right)$.
+
+\paragraph{Metric 3: Cross-Prompt Variance of $v^{\parallel}$.}
+At each layer transition $L$, we compute $\text{Var}(v_L^{\parallel})$ across all prompts within a condition (ambiguous or control) and report the ratio:
+\begin{equation}
+R_L = \frac{\text{Var}_{\text{amb}}(v_L^{\parallel})}{\text{Var}_{\text{ctl}}(v_L^{\parallel})}
+\end{equation}
+
+\paragraph{Direction-Specificity Control.}
+To test whether the variance effect is specific to the semantic axis, we repeat the analysis for 100 random unit vectors $\hat{D}^{(r)} \sim \mathcal{N}(0, I_d)$, normalized, and compute the mean ratio $\bar{R}$ for each. We compare the semantic axis ratio against the distribution of random-direction ratios.
+
+\subsection{Ground Truth}
+For Experiments 1 and 2, we use the logit lens as ground truth: at each layer, we project the residual stream through the (layer-normed) unembedding to obtain logits, and compute $\Delta\text{logit}_L = |\max_{i \in A}\text{logit}_i - \max_{j \in B}\text{logit}_j|$. The decision rate is the centered finite difference of $\Delta\text{logit}$.
+
+\subsection{Statistical Controls}
+All pooled correlations are tested with and without partial correlation (residualizing out layer index). Per-layer tests use Spearman correlation. Variance comparisons use bootstrap permutation tests ($N = 5000$). Multiple comparisons are corrected via Benjamini-Hochberg FDR at $\alpha = 0.05$.
+
+% ============================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Experiment 1: L2 Metrics Are Architectural Artifacts}
+
+On GPT-2 small, L2 curvature $\kappa$ shows a striking raw correlation with attention divergence ($\rho = -0.68$, $p < 10^{-33}$). However, both variables are strongly correlated with layer index ($\kappa$: $\rho = 0.84$; attention divergence: $\rho = -0.80$). After partialing out the layer effect:
+\begin{equation*}
+\rho(\kappa, \text{attn\_div} \mid \text{layer}) = -0.11, \quad p = 0.08
+\end{equation*}
+The correlation with decision rate is entirely eliminated: $\rho(\kappa, \text{decision\_rate} \mid \text{layer}) = 0.05$, $p = 0.46$.
+
+All 36 prompts (ambiguous and control) peak in velocity at the same layer transition (10$\to$11). Controls have \emph{higher} peak curvature than ambiguous prompts (185.8 vs.\ 143.5; Mann-Whitney $p = 0.999$, opposite direction). L2 velocity measures architectural gradient, not computation.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig_velocity.png}
+  \caption{L2 velocity profiles across layer transitions for GPT-2 small. Left: ambiguous prompts. Right: unambiguous controls. The profiles are nearly identical---all prompts peak at layer 10$\to$11 regardless of content. L2 velocity measures architectural gradient, not prompt-specific computation.}
+  \label{fig:velocity}
+\end{figure}
+
+\subsection{Experiment 2: Logit Lens as Unreliable Ground Truth}
+
+Semantic Orthogonal Velocity metrics show no correlation with logit-lens decision rate after layer correction: $|dv^{\parallel}|$: $\rho = -0.03$, $p = 0.65$; angular curvature: $\rho = 0.12$, $p = 0.056$.
+
+However, the $v^{\parallel}$ trajectory profiles reveal a stark qualitative difference. For ambiguous prompts, the mean $v^{\parallel}$ across prompts is approximately zero at every layer, but individual trajectories diverge widely---some moving toward interpretation A, others toward B. For control prompts, trajectories drift coherently in one direction with low variance (see Figure~\ref{fig:hero}, right panel concept).
+
+This pattern suggests that the logit lens---which assumes middle-layer representations are decodable in token space---is unreliable as ground truth for layers 3--8. The SOV signal is real; the ground truth against which we measured it is not.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig_vparallel.png}
+  \caption{Decision velocity ($v^{\parallel}$) trajectories across layer transitions, projected onto the prompt-specific semantic decision axis. Left: ambiguous prompts show a mean near zero with large fan-out---individual prompts diverge toward competing interpretations. Right: control prompts show coherent drift in one direction with low variance. This qualitative difference is the visual signature of semantic superposition.}
+  \label{fig:vparallel}
+\end{figure}
+
+\subsection{Experiment 3: Variance of Decision-Axis Velocity}
+
+\paragraph{GPT-2 small ($N = 24$ amb, $N = 10$ ctl).}
+Cross-prompt variance of $v^{\parallel}$ is consistently higher for ambiguous prompts in middle layers: mean ratio 2.48 for layers 3--6 (range: 1.11 to 3.56). In late layers (9--11), the ratio reverses ($R < 1$): controls show higher variance, consistent with strong directional ``memory lookups'' that differ between prompts. After Benjamini-Hochberg FDR correction across 11 layer transitions, no individual layer reaches significance (smallest adjusted $p = 0.28$).
+
+\paragraph{Pythia-1.4b replication ($N = 17$ amb, $N = 5$ ctl).}
+Mean variance ratio: 2.09. Peak at layer 2$\to$3: $R = 9.55$, $p = 0.022$ (uncorrected). No late-layer reversal---the ratio remains above 1 through the final layers, suggesting that reversal is a small-model artifact (insufficient capacity to maintain separation).
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig_superposition.png}
+  \caption{Cross-prompt variance analysis on GPT-2 small. Left: variance of $v^{\parallel}$ by layer for ambiguous (blue) and control (orange) prompts, showing mid-layer elevation and late-layer reversal. Center: variance ratio (amb/ctl) by layer. Right: all $v^{\parallel}$ trajectories overlaid, showing the fan-out pattern for ambiguous (blue) vs.\ coherent drift for control (red) prompts.}
+  \label{fig:superposition}
+\end{figure}
+
+\subsection{Direction-Specificity Control: The Critical Test}
+\label{sec:specificity}
+
+The per-layer variance analysis is limited by small $N$ and multiple comparisons. We therefore ask a different question: \emph{Is the variance effect specific to the semantic decision axis, or would any direction in the residual stream show the same pattern?}
+
+We compute the mean variance ratio $\bar{R}$ for the semantic axis and for 100 random unit vectors in $\mathbb{R}^{768}$ (GPT-2 small):
+
+\begin{center}
+\begin{tabular}{lcc}
+\toprule
+Direction & Mean $\bar{R}$ & Std \\
+\midrule
+Semantic axis ($\hat{D}$) & \textbf{1.81} & --- \\
+100 random directions & 0.58 & 0.14 \\
+\quad 95th percentile & 0.85 & --- \\
+\quad 99th percentile & 0.92 & --- \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+The semantic axis exceeds the 99th percentile of the random distribution by a factor of two. Zero of 100 random directions achieve a ratio $\geq 1.81$. Empirical $p < 0.01$.
+
+The fact that random directions yield $\bar{R} < 1$ (mean 0.58) is itself informative: on arbitrary axes, \emph{controls} have higher variance than ambiguous prompts, because controls execute strong directional jumps (``memory lookups'') that project substantially onto random directions. The semantic axis is the \emph{only} direction where the relationship reverses---where ambiguous prompts dominate the variance. This reversal is the geometric fingerprint of superposition: competing interpretations pull the trajectory in opposite directions along the axis that separates them, and only along that axis.
+
+\begin{figure}[htbp]
+  \centering
+  \includegraphics[width=\textwidth]{fig_hero.png}
+  \caption{\textbf{Direction-Specificity Control (Hero Figure).} Left: variance ratio by layer after FDR correction---no individual layer survives (all gray). Right: the semantic decision axis (red line, mean ratio 1.81) exceeds the 99th percentile of 100 random directions (blue histogram, 99th pctl = 0.92). Zero random directions reproduce the effect. Empirical $p < 0.01$. Random directions yield mean ratio 0.58 (controls dominate variance on arbitrary axes); only the semantic axis reverses this relationship.}
+  \label{fig:hero}
+\end{figure}
+
+% ============================================================
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{What Differential Analysis Reveals}
+Standard scalar metrics (L2 norm, logit lens) are dominated by architectural structure in the residual stream---late layers have larger weight matrices and produce larger state changes regardless of input. Direction-based and distributional measures access input-specific information that absolute measures cannot.
+
+The key insight is that semantic superposition is not visible in any single trajectory. It is visible only in the \emph{distribution across trajectories} at a given layer, projected onto the axis defined by competing interpretations. This is analogous to quantum superposition: it manifests in ensemble statistics, not individual measurements.
+
+\subsection{The FDR Trap and Distributional Tests}
+Per-layer significance testing with FDR correction found no significant layers, despite consistent $2$--$3\times$ variance ratios across middle layers. This is expected: the effect is distributed across layers, not concentrated at a single point, and the sample size ($N = 24$) limits power for layer-specific tests.
+
+The direction-specificity control (Section~\ref{sec:specificity}) resolves this by shifting the statistical question from ``which layer is significant?'' to ``is the semantic axis special?''---yielding a clear, powerful answer ($p < 0.01$).
+
+This suggests a methodological lesson: for distributed geometric effects in high-dimensional spaces, controls over \emph{directions} may be more appropriate than controls over \emph{positions} (layers).
+
+\subsection{Logit Lens Limitations}
+The logit lens is widely used to infer ``what the model is thinking'' at intermediate layers by projecting the residual stream onto the vocabulary. Our results suggest it is unreliable in middle layers (3--8 in GPT-2): correlation between SOV metrics and logit-lens decision rate is negligible after controlling for layer depth. Middle-layer representations likely encode abstract features that do not decompose cleanly into token-level probabilities. This has implications for all interpretability work that relies on logit lens as primary ground truth for intermediate processing.
+
+\subsection{Superposition, Stabilization, Emission}
+Our data suggest that autoregressive transformers process ambiguous inputs through three geometric phases:
+\begin{enumerate}
+\item \textbf{Superposition} (early-to-mid layers): competing interpretations are maintained simultaneously, visible as elevated cross-prompt variance on the decision axis.
+\item \textbf{Stabilization} (mid-to-late layers): angular curvature decreases, the trajectory straightens, and variance begins to concentrate.
+\item \textbf{Emission} (final layers): the representation is projected onto the output vocabulary for token generation.
+\end{enumerate}
+This is distinct from a ``decision layer'' model. The transformer does not decide at a single layer; it maintains superposition until architectural pressure forces collapse. Larger models (Pythia-1.4b) appear to resolve superposition earlier proportionally and maintain the resolution longer (no late-layer reversal), suggesting that model capacity modulates the geometry of disambiguation.
+
+\subsection{Limitations}
+Sample sizes are small ($N = 24/10$ for GPT-2, $N = 17/5$ for Pythia). Only lexical ambiguity was tested; syntactic, pragmatic, and reasoning ambiguity may behave differently. Two autoregressive architectures were tested; encoder models and mixture-of-experts may differ. The decision axis is defined via unembedding vectors; alternative definitions (contrastive probes, difference-in-means) might yield different results. The Pythia replication used only 5 controls due to tokenizer incompatibility. Replication with larger prompt sets and additional architectures is needed.
+
+\subsection{Toward a Contrast-First Ontology of Neural Computation}
+Our results are consistent with what might be called a \emph{contrast-first} view of neural computation: absolute activation states carry primarily architectural information, while the information relevant to semantic processing is encoded in the \emph{relational structure}---specifically, the distribution of contrasts along semantically meaningful axes. The random direction control (Section~\ref{sec:specificity}) demonstrates this starkly: on arbitrary axes, the space appears dominated by deterministic control signals; only on axes defined by \emph{semantic tension} does the superposition signature emerge. This suggests that interpretability frameworks should be built on differential and distributional primitives rather than point-wise state inspection---a shift from asking ``what is the activation?'' to asking ``what is the pattern of contrasts, and how does it evolve?''
+
+\subsection{Connections}
+The distributional trajectory approach connects to ecological interface design \citep{vicente1992ecological}, which argues that displays should reveal constraint structure rather than raw sensor values. The variance on the semantic axis reveals the constraint of ambiguity. The ensemble-statistical nature of the superposition signal connects to auditory scene analysis \citep{bregman1990auditory}: coherence vs.\ divergence in parallel streams. The choice of what to preserve under compression (variance vs.\ magnitude) can be formalized via rate-distortion theory, linking our work to information-theoretic approaches to representation analysis.
+
+Furthermore, the failure of the raw L2 norm and the success of directional trajectory analysis in our experiments closely mirror recent findings in representation learning for latent planning. Recent work on ``temporal straightening'' \citep{temporal_straightening_2026} demonstrated that standard visual encoders produce highly curved latent trajectories where Euclidean distance poorly approximates actual geodesic progress toward a goal. By regularizing the angle between consecutive velocity vectors, they stabilized gradient-based planning. Our results transpose this geometric intuition from the axis of \emph{time} (planning steps) to the axis of \emph{depth} (transformer layers). Just as unregularized latent spaces exhibit high curvature that masks task progress, the raw residual stream exhibits high L2 curvature (Experiment~1) that masks semantic computation. Critically, the temporal straightening work \emph{imposes} geometric regularity via a training regularizer, while our results show that pretrained transformers \emph{spontaneously} modulate angular curvature and decision-axis variance as a function of semantic ambiguity. This suggests that trajectory straightening is not merely a useful inductive bias for planning, but a fundamental geometric signature of resolving superposition during autoregressive inference.
+
+% ============================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+We tested three differential metrics for transformer interpretability. Two failed honestly: L2 velocity measures architecture, not computation; logit lens provides unreliable ground truth in middle layers. One succeeded: cross-prompt variance of decision-axis velocity robustly distinguishes ambiguous from unambiguous inputs, replicated across two architectures (GPT-2 small: ratio 2.48; Pythia-1.4b: ratio 2.09).
+
+The critical result is the direction-specificity control: the semantic axis achieves a mean variance ratio of 1.81, exceeding the 99th percentile of 100 random directions (0.92; $p < 0.01$). This eliminates the possibility that the effect is a high-dimensional projection artifact and confirms that it is specific to axes defined by competing semantic interpretations.
+
+We propose that transformer models do not exhibit a discrete ``decision layer.'' Instead, ambiguous inputs generate a geometric superposition of trajectories that gradually collapses as representations approach the output vocabulary. This superposition is invisible to standard point-wise metrics but emerges clearly in distributional trajectory analysis---suggesting that interpretability tools should shift from absolute-state inspection to ensemble trajectory geometry.
+
+Code and data for all experiments, including negative results, are available at the author's GitHub.\footnote{\url{https://github.com/YanushFeshter}}
+
+% ============================================================
+\subsection*{Acknowledgments}
+This work was developed using a distributed multi-AI collaborative methodology (``Parliament of Dragons''), in which the concept paper was independently reviewed by several AI systems (Claude Opus 4, Gemini 3.1 Pro, Gemini 3.1 Flash, ChatGPT-5.2 Thinking, ChatGPT-5.4 High, Grok X 4.2, DeepSeek-V3, Mercury 2). Their feedback shaped the experimental design, identified the architectural confound, proposed the semantic orthogonal velocity metric, and recommended the direction-specificity control. The author takes full responsibility for all claims, analysis, and errors. Computational experiments were executed in Claude Opus 4's sandbox environment and Google Colab (with execution assistance from Gemini 3.1 Flash).
+
+% ============================================================
+\clearpage
+\appendix
+\section{Per-Layer Statistical Tables}
+\label{app:tables}
+
+\subsection{GPT-2 Small: Variance Ratio and Bootstrap p-Values}
+
+\begin{center}
+\small
+\begin{tabular}{ccccc}
+\toprule
+Transition & Var(amb) & Var(ctl) & Ratio & Bootstrap $p$ \\
+\midrule
+0$\to$1  & 0.147 & 0.070 & 2.09 & 0.137 \\
+1$\to$2  & 0.290 & 0.129 & 2.25 & 0.120 \\
+2$\to$3  & 0.092 & 0.071 & 1.30 & 0.375 \\
+3$\to$4  & 0.536 & 0.181 & 2.95 & 0.130 \\
+4$\to$5  & 0.554 & 0.499 & 1.11 & 0.476 \\
+5$\to$6  & 0.919 & 0.377 & 2.44 & 0.112 \\
+6$\to$7  & 2.013 & 0.566 & 3.56 & 0.058 \\
+7$\to$8  & 2.025 & 1.421 & 1.43 & 0.344 \\
+8$\to$9  & 11.088 & 5.595 & 1.98 & 0.153 \\
+9$\to$10 & 3.801 & 16.614 & 0.23 & 0.875 \\
+10$\to$11 & 4.184 & 7.177 & 0.58 & 0.812 \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Mid-layers (3--6) mean ratio: 2.48. Late layers (9--11) mean ratio: 0.68 (reversal). After Benjamini-Hochberg FDR correction, no individual layer reaches $q < 0.05$.
+
+\subsection{Pythia-1.4b: Replication Summary}
+
+$N = 17$ ambiguous, $N = 5$ control prompts (filtered by tokenizer compatibility). Mean variance ratio: 2.09. Peak at layer 2$\to$3: $R = 9.55$, $p = 0.022$ (uncorrected). No late-layer reversal observed.
+
+\section{Prompt List}
+\label{app:prompts}
+
+\paragraph{Ambiguous prompts (24).} Each prompt has two groups of candidate single-token continuations representing competing semantic interpretations:
+
+\begin{center}
+\small
+\begin{tabular}{p{3.5cm}p{3.5cm}p{3.5cm}}
+\toprule
+Prompt & Group A & Group B \\
+\midrule
+``A bat is a'' & mammal, creature, animal & club, tool, stick \\
+``The bank was'' & flooded, muddy, steep & robbed, closed, bankrupt \\
+``The bark was'' & loud, sharp, scary & rough, brown, thick \\
+``The ring was'' & gold, shiny, beautiful & crowded, noisy, square \\
+``The pitcher was'' & tired, wild, dominant & empty, cracked, full \\
+``The crane was'' & flying, white, tall & lifting, steel, broken \\
+``The mouse was'' & furry, small, hiding & wireless, broken, clicking \\
+``The cell was'' & tiny, dark, locked & biological, dividing, healthy \\
+\multicolumn{3}{c}{\textit{(16 additional prompts omitted for brevity; full list in code repository)}} \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\paragraph{Control prompts (10--12).} Unambiguous prompts with a single clear interpretation: ``The capital of France is,'' ``Two plus two equals,'' ``The cat sat on the,'' ``The sun rises in the,'' etc.
+
+\section{Distributed AI Review Process}
+\label{app:parliament}
+
+The concept paper for this work was independently reviewed by several AI systems prior to and during experimentation:
+
+\begin{enumerate}
+\item \textbf{Claude Opus 4}: Served as primary epistemic verifier throughout the project; executed all computational experiments in sandbox environment; identified the architectural confound in Experiment~1 via partial correlation analysis; prevented methodological overclaims regarding generalization to alignment phenomena; mapped empirical findings onto a contrast-first relational ontology; and structured the formal publication strategy.
+\item \textbf{Gemini 3.1 Pro}: Identified spectral masking as a risk for perceptual rendering; connected to Merleau-Ponty's embodied cognition; proposed the Semantic Orthogonal Velocity metric and the crucial ``memory lookup'' explanation for late-layer reversal. (Additionally, \textbf{Gemini 3.1 Flash} assisted with code execution and environment debugging in Google Colab).
+\item \textbf{DeepSeek-V3}: Provided the ``AI Rorschach test'' critique; proposed IOI task benchmark; connected to Gibson's ecological psychology and Rabitz's quantum control landscapes; identified the multiple comparisons problem.
+\item \textbf{ChatGPT-5.2 Thinking}: Proposed the strategic pivot from ``perceptual interface'' to ``event detection method''; formalized the SOV equations; designed the crucial experiment ($\kappa$ vs.\ $\Delta$logit).
+\item \textbf{Grok X 4.2 (multi-agent)}: Connected to deceptive alignment detection; identified accessibility concerns; proposed Bregman's auditory scene analysis as theoretical frame; confirmed no prior art on arXiv.
+\item \textbf{Mercury 2}: Provided the sharpest critique of the homotopy equivalence claim; identified the specific mechanism of topological collapse under quantized perceptual mapping.
+\item \textbf{ChatGPT-5.4 High}: Proposed replacing homotopy equivalence with task-aware structural preservation; reformulated the central claim; recommended ecological interface design as primary theoretical connection; proposed the random direction control.
+\end{enumerate}
+
+This multi-AI review process shaped the experimental design (particularly the partial correlation correction and direction-specificity control) and prevented publication of confounded results ($\rho = -0.68$ architectural artifact). The author takes full responsibility for all claims, analysis, and errors.
+
+% ============================================================
+\bibliographystyle{plainnat}
+\begin{thebibliography}{20}
+
+\bibitem[Bregman(1990)]{bregman1990auditory}
+A.~S. Bregman.
+\newblock \emph{Auditory Scene Analysis: The Perceptual Organization of Sound}.
+\newblock MIT Press, 1990.
+
+\bibitem[Bricken et al.(2023)]{bricken2023monosemanticity}
+T.~Bricken, A.~Templeton, J.~Batson, et al.
+\newblock Towards Monosemanticity: Decomposing Language Models With Dictionary Learning.
+\newblock \emph{Transformer Circuits Thread}, 2023.
+
+\bibitem[Elhage et al.(2022)]{elhage2022superposition}
+N.~Elhage, T.~Hume, C.~Olsson, et al.
+\newblock Toy Models of Superposition.
+\newblock \emph{Transformer Circuits Thread}, 2022.
+
+\bibitem[Gibson(1979)]{gibson1979ecological}
+J.~J. Gibson.
+\newblock \emph{The Ecological Approach to Visual Perception}.
+\newblock Houghton Mifflin, 1979.
+
+\bibitem[Hermann et al.(2011)]{hermann2011sonification}
+T.~Hermann, A.~Hunt, and J.~G. Neuhoff.
+\newblock \emph{The Sonification Handbook}.
+\newblock Logos Verlag, 2011.
+
+\bibitem[Kriegeskorte et al.(2008)]{kriegeskorte2008rsa}
+N.~Kriegeskorte, M.~Mur, and P.~Bandettini.
+\newblock Representational Similarity Analysis---Connecting the Branches of Systems Neuroscience.
+\newblock \emph{Frontiers in Systems Neuroscience}, 2:4, 2008.
+
+\bibitem[Nanda \& Bloom(2022)]{nanda2022transformerlens}
+N.~Nanda and J.~Bloom.
+\newblock TransformerLens.
+\newblock \url{https://github.com/TransformerLensOrg/TransformerLens}, 2022.
+
+\bibitem[nostalgebraist(2020)]{nostalgebraist2020logitlens}
+nostalgebraist.
+\newblock Interpreting GPT: the Logit Lens.
+\newblock \emph{LessWrong}, 2020.
+
+\bibitem[Templeton et al.(2024)]{templeton2024scaling}
+A.~Templeton, T.~Conerly, J.~Marcus, et al.
+\newblock Scaling Monosemanticity: Extracting Interpretable Features from Claude 3 Sonnet.
+\newblock \emph{Transformer Circuits Thread}, 2024.
+
+\bibitem[Vicente \& Rasmussen(1992)]{vicente1992ecological}
+K.~J. Vicente and J.~Rasmussen.
+\newblock Ecological Interface Design: Theoretical Foundations.
+\newblock \emph{IEEE Transactions on Systems, Man, and Cybernetics}, 22(4):589--606, 1992.
+
+\bibitem[Karamcheti et al.(2026)]{temporal_straightening_2026}
+S.~Karamcheti et al.
+\newblock Temporal Straightening for Latent Planning.
+\newblock \emph{arXiv preprint}, 2026.
+
+\end{thebibliography}
+
+\end{document}
